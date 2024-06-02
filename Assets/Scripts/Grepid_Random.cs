@@ -72,7 +72,13 @@ namespace Grepid.Random
             return result;
         }
 
-        public static float[] InverseWeightWorth(ICollection<float> weights)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="weights"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        /*public static float[] InverseWeightWorth(ICollection<float> weights)
         {
             float[] result = weights.ToArray();
             float top = 0;
@@ -90,6 +96,26 @@ namespace Grepid.Random
             {
                 float alpha = Mathf.Lerp(1, 0, result[i] / top);
                 result[i] = Mathf.Lerp(bottom,top,alpha);
+            }
+            return result.ToArray();
+        }*/
+
+        public static float[] InverseWeightWorth(ICollection<float> weights)
+        {
+            float[] result = weights.ToArray();
+            float max = 0;
+            foreach (float f in result)
+            {
+                if (f < 0)
+                {
+                    throw new ArgumentException("All weights should be positive. Use AbsWeights or ShiftWeightsToPositive if needed.");
+                }
+                max += f;
+            }
+            for (int i = 0; i < result.Length; i++)
+            {
+                float alpha = Mathf.Lerp(1, 0, result[i] / max);
+                result[i] = Mathf.Lerp(0, max, alpha);
             }
             return result.ToArray();
         }
