@@ -83,12 +83,4 @@ public class RandomTester : MonoBehaviour
             print(weightClasses[i].name);
         }*/
     }
-    [ContextMenu("XWeightTestsInvertedTest")]
-    private void XWeightTestsInvertedTest()
-    {
-        foreach (int i in Weighted.RandomIndexesInverted(weightFloats, X, false))
-        {
-            print(weightClasses[i].name);
-        }
-    }
 }
