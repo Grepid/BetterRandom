@@ -8,7 +8,7 @@ using System.Xml;
 using UnityEditor;
 using UnityEngine;
 
-namespace Grepid.Random
+namespace Grepid.BetterRandom
 {
     #region Weighted
     public static class Weighted
@@ -169,7 +169,7 @@ namespace Grepid.Random
         /// <param name="weights"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static float[] FlipValues(ICollection<float> weights)
+        public static float[] FlipWeights(ICollection<float> weights)
         {
             float[] result = weights.ToArray();
             float top = 0;

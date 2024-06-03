@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Grepid.Random;
+using Grepid.BetterRandom;
 using System.Globalization;
 
 public class RandomTester : MonoBehaviour
@@ -40,7 +40,7 @@ public class RandomTester : MonoBehaviour
     [ContextMenu("FlipWeights")]
     private void FlipWeights()
     {
-        foreach(float f in Weighted.FlipValues(weightFloats))
+        foreach(float f in Weighted.FlipWeights(weightFloats))
         {
             print(f);
         }
@@ -69,7 +69,7 @@ public class RandomTester : MonoBehaviour
         {
             print(weightClasses[i].name);
         }*/
-        foreach (int i in Weighted.RandomIndexes(Weighted.FlipValues(weightFloats), X, false))
+        foreach (int i in Weighted.RandomIndexes(Weighted.FlipWeights(weightFloats), X, false))
         {
             print(weightClasses[i].name);
         }
