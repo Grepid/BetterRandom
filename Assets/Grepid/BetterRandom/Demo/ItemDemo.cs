@@ -1,6 +1,9 @@
-[System.Serializable]
-public class ItemDemo
+namespace Grepid.BetterRandom
 {
-    public string Name;
-    public float SpawnChance;
+    [System.Serializable]
+    public class ItemDemo
+    {
+        public string Name;
+        public float SpawnChance;
+    }
 }
