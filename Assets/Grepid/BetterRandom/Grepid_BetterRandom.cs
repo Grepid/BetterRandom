@@ -17,92 +17,86 @@ namespace Grepid.Random
         private static ConcurrentDictionary<string,FieldInfo> s_fieldCache = new ConcurrentDictionary<string,FieldInfo>();
 
         /// <summary>
-        /// Shifts all numbers positively the distance of the lowest negative value's Absolute value + 1 (so it doesn't get flagged as 0) ({-2,3,6} would go to {1,6,9})
+        /// Will return an object from a collection based on weighted calculation given the field name for the weights.
         /// </summary>
-        /// <param name="weights"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="objects"></param>
+        /// <param name="weightFieldName"></param>
         /// <returns></returns>
-        public static float[] ShiftWeightsToPositive(ICollection<float> weights)
+        public static T RandomFromCollection<T>(ICollection<T> objects,string weightFieldName)
         {
-            float[] result = weights.ToArray();
-            float shiftFactor = 0;
-            foreach(float f in weights)
-            {
-                if (f < shiftFactor) shiftFactor = f;
-            }
-            if(shiftFactor == 0) return result;
-            for(int i = 0; i < result.Length; i++)
-            {
-                result[i] += Mathf.Abs(shiftFactor-1);
-            }
-            return result;
+            var asWeights = ToWeights(objects, weightFieldName);
+            return objects.ElementAt(RandomIndex(asWeights));
         }
 
         /// <summary>
-        /// Shifts all numbers negatively the distance of the highest positive value + 1 (so it doesn't get flagged as 0).({2,-3,-6} would go to {-1,-6,-9}) 
+        /// Will return an Array of objects from a collection based on weight calculations.
         /// </summary>
-        /// <param name="weights"></param>
-        /// <returns></returns>
-        public static float[] ShiftWeightsToNegative(ICollection<float> weights)
-        {
-            float[] result = weights.ToArray();
-            float shiftFactor = 0;
-            foreach (float f in weights)
-            {
-                if (f > shiftFactor) shiftFactor = f;
-            }
-            if (shiftFactor == 0) return result;
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] -= shiftFactor+1;
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Will convert all values to their Absolute value.
-        /// </summary>
-        /// <param name="weights"></param>
-        /// <returns></returns>
-        public static float[] AbsWeights(ICollection<float> weights)
-        {
-            float[] result = weights.ToArray();
-            for(int i = 0;i < result.Length; i++)
-            {
-                result[i] = Mathf.Abs(result[i]);
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// Will Flip all the values in place. Lowest value becomes highest, highest lowest, and everything between flipped.
-        /// If not producing expected results, please refer to documentation
-        /// </summary>
-        /// <param name="weights"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="objects"></param>
+        /// <param name="weightFieldName"></param>
+        /// <param name="repetitions"></param>
+        /// <param name="noDupes"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static float[] FlipValues(ICollection<float> weights)
+        public static T[] RandomFromCollection<T>(ICollection<T> objects, string weightFieldName, int repetitions, bool noDupes)
         {
-            float[] result = weights.ToArray();
-            float top = 0;
-            float bottom = result[0];
-            int index = 0;
-            foreach (float f in result)
+            List<T> modifiedObjects = new List<T>(objects);
+            if (noDupes && repetitions > modifiedObjects.Count)
             {
-                if (f < 0)
-                {
-                    throw new ArgumentException("All weights should be positive. Use AbsWeights or ShiftWeightsToPositive if needed.");
-                }
-                if (f > top) top = f;
-                if (f < bottom) bottom = f;
-                result[index] *= -1;
+                throw new ArgumentException("Cannot have more repetitions than objects whilst not allowing dupes.");
+            }
+            List<T> result = new List<T>();
+
+            for (int i = 0; i < repetitions; i++)
+            {
+                T rand = RandomFromCollection(modifiedObjects, weightFieldName);
+                result.Add(rand);
+                if (noDupes) modifiedObjects.Remove(rand);
+            }
+            return result.ToArray();
+        }
+
+        /// <summary>
+        /// Will convert any given collection of objects into a float array given a field name to look for.
+        /// Useful for creating a collection of weights from an Array of Class instances.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="objects"></param>
+        /// <param name="fieldName"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentException"></exception>
+        public static float[] ToWeights<T>(ICollection<T> objects, string fieldName)
+        {
+            float[] result = new float[objects.Count];
+
+            Type type = typeof(T);
+            string cacheKey = type.FullName + "_" + fieldName;
+            FieldInfo fi;
+            if (s_fieldCache.ContainsKey(cacheKey))
+            {
+                fi = s_fieldCache[cacheKey];
+            }
+            else
+            {
+                fi = type.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                s_fieldCache[cacheKey] = fi;
+            }
+
+            if(fi == null)
+            {
+                throw new ArgumentException("The passed field " + fieldName + " was not found in " + type);
+            }
+
+            int index = 0;
+            foreach (T obj in objects)
+            {
+                float value = (float)fi.GetValue(obj);
+                result[index] = value;
                 index++;
             }
-            for(int i = 0; i < result.Length; i++)
-            {
-                result[i] += (bottom + top);
-            }
             return result;
-        }
+        } 
 
         /// <summary>
         /// Will return the index of the weight that was selected through weighted calculation.
@@ -169,85 +163,91 @@ namespace Grepid.Random
         }
 
         /// <summary>
-        /// Will convert any given collection of objects into a float array given a field name to look for.
-        /// Useful for creating a collection of weights from an Array of Class instances.
+        /// Will Flip all the values in place. Lowest value becomes highest, highest lowest, and everything between flipped.
+        /// If not producing expected results, please refer to documentation
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="objects"></param>
-        /// <param name="fieldName"></param>
+        /// <param name="weights"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static float[] ToWeights<T>(ICollection<T> objects, string fieldName)
+        public static float[] FlipValues(ICollection<float> weights)
         {
-            float[] result = new float[objects.Count];
-
-            Type type = typeof(T);
-            string cacheKey = type.FullName + "_" + fieldName;
-            FieldInfo fi;
-            if (s_fieldCache.ContainsKey(cacheKey))
-            {
-                fi = s_fieldCache[cacheKey];
-            }
-            else
-            {
-                fi = type.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                s_fieldCache[cacheKey] = fi;
-            }
-
-            if(fi == null)
-            {
-                throw new ArgumentException("The passed field " + fieldName + " was not found in " + type);
-            }
-
+            float[] result = weights.ToArray();
+            float top = 0;
+            float bottom = result[0];
             int index = 0;
-            foreach (T obj in objects)
+            foreach (float f in result)
             {
-                float value = (float)fi.GetValue(obj);
-                result[index] = value;
+                if (f < 0)
+                {
+                    throw new ArgumentException("All weights should be positive. Use AbsWeights or ShiftWeightsToPositive if needed.");
+                }
+                if (f > top) top = f;
+                if (f < bottom) bottom = f;
+                result[index] *= -1;
                 index++;
             }
+            for(int i = 0; i < result.Length; i++)
+            {
+                result[i] += (bottom + top);
+            }
             return result;
-        } 
-
-        /// <summary>
-        /// Will return an object from a collection based on weighted calculation given the field name for the weights.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="objects"></param>
-        /// <param name="weightFieldName"></param>
-        /// <returns></returns>
-        public static T RandomFromCollection<T>(ICollection<T> objects,string weightFieldName)
-        {
-            var asWeights = ToWeights(objects, weightFieldName);
-            return objects.ElementAt(RandomIndex(asWeights));
         }
 
         /// <summary>
-        /// Will return an Array of objects from a collection based on weight calculations.
+        /// Shifts all numbers positively the distance of the lowest negative value's Absolute value + 1 (so it doesn't get flagged as 0) ({-2,3,6} would go to {1,6,9})
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="objects"></param>
-        /// <param name="weightFieldName"></param>
-        /// <param name="repetitions"></param>
-        /// <param name="noDupes"></param>
+        /// <param name="weights"></param>
         /// <returns></returns>
-        /// <exception cref="ArgumentException"></exception>
-        public static T[] RandomFromCollection<T>(ICollection<T> objects, string weightFieldName, int repetitions, bool noDupes)
+        public static float[] ShiftWeightsToPositive(ICollection<float> weights)
         {
-            List<T> modifiedObjects = new List<T>(objects);
-            if (noDupes && repetitions > modifiedObjects.Count)
+            float[] result = weights.ToArray();
+            float shiftFactor = 0;
+            foreach(float f in weights)
             {
-                throw new ArgumentException("Cannot have more repetitions than objects whilst not allowing dupes.");
+                if (f < shiftFactor) shiftFactor = f;
             }
-            List<T> result = new List<T>();
+            if(shiftFactor == 0) return result;
+            for(int i = 0; i < result.Length; i++)
+            {
+                result[i] += Mathf.Abs(shiftFactor-1);
+            }
+            return result;
+        }
 
-            for (int i = 0; i < repetitions; i++)
+        /// <summary>
+        /// Shifts all numbers negatively the distance of the highest positive value + 1 (so it doesn't get flagged as 0).({2,-3,-6} would go to {-1,-6,-9}) 
+        /// </summary>
+        /// <param name="weights"></param>
+        /// <returns></returns>
+        public static float[] ShiftWeightsToNegative(ICollection<float> weights)
+        {
+            float[] result = weights.ToArray();
+            float shiftFactor = 0;
+            foreach (float f in weights)
             {
-                T rand = RandomFromCollection(modifiedObjects, weightFieldName);
-                result.Add(rand);
-                if (noDupes) modifiedObjects.Remove(rand);
+                if (f > shiftFactor) shiftFactor = f;
             }
-            return result.ToArray();
+            if (shiftFactor == 0) return result;
+            for (int i = 0; i < result.Length; i++)
+            {
+                result[i] -= shiftFactor+1;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Will convert all values to their Absolute value.
+        /// </summary>
+        /// <param name="weights"></param>
+        /// <returns></returns>
+        public static float[] AbsWeights(ICollection<float> weights)
+        {
+            float[] result = weights.ToArray();
+            for(int i = 0;i < result.Length; i++)
+            {
+                result[i] = Mathf.Abs(result[i]);
+            }
+            return result;
         }
     }
     #endregion
