@@ -330,13 +330,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2a3ff8153002ebd45b5a3e4df44e0d42, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  X: 10000
   weightClasses:
   - name: Jeff
-    weight: 1
+    weight: 10
   - name: Bob
-    weight: 7
+    weight: 15
   - name: Jim
-    weight: 21
+    weight: 5
+  - name: Josh
+    weight: 20
+  - name: Dun
+    weight: 50
 --- !u!4 &1233933362
 Transform:
   m_ObjectHideFlags: 0

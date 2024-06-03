@@ -7,13 +7,15 @@ using System.Reflection;
 using System.Xml;
 using UnityEditor;
 using UnityEngine;
+using static UnityEngine.Networking.UnityWebRequest;
 
 namespace Grepid.Random
 {
+    #region Weighted
     public static class Weighted
     {
         [Tooltip("Holds the keys for Reflection lookups to save needing to do the Reflection every time for the same fields")]
-        private static ConcurrentDictionary<string,FieldInfo> fieldCache = new ConcurrentDictionary<string,FieldInfo>();
+        private static ConcurrentDictionary<string,FieldInfo> s_fieldCache = new ConcurrentDictionary<string,FieldInfo>();
 
         /// <summary>
         /// Shifts all numbers positively the distance of the lowest negative value's Absolute value + 1 (so it doesn't get flagged as 0) ({-2,3,6} would go to {1,6,9})
@@ -58,7 +60,7 @@ namespace Grepid.Random
         }
 
         /// <summary>
-        /// Will convert all values to their Absolute value. Not recommended to use unless you know your use-case
+        /// Will convert all values to their Absolute value.
         /// </summary>
         /// <param name="weights"></param>
         /// <returns></returns>
@@ -73,51 +75,34 @@ namespace Grepid.Random
         }
 
         /// <summary>
-        /// 
+        /// Will Flip all the values in place. Lowest value becomes highest, highest lowest, and everything between flipped.
+        /// If not producing expected results, please refer to documentation
         /// </summary>
         /// <param name="weights"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        /*public static float[] InverseWeightWorth(ICollection<float> weights)
+        public static float[] FlipValues(ICollection<float> weights)
         {
             float[] result = weights.ToArray();
             float top = 0;
             float bottom = result[0];
-            foreach(float f in result)
-            {
-                if(f < 0)
-                {
-                    throw new ArgumentException("All weights should be positive. Use AbsWeights or ShiftWeightsToPositive if needed.");
-                }
-                if (f > top) top = f;
-                if (f < bottom) bottom = f;
-            }
-            for(int i = 0; i < result.Length; i++)
-            {
-                float alpha = Mathf.Lerp(1, 0, result[i] / top);
-                result[i] = Mathf.Lerp(bottom,top,alpha);
-            }
-            return result.ToArray();
-        }*/
-
-        public static float[] InverseWeightWorth(ICollection<float> weights)
-        {
-            float[] result = weights.ToArray();
-            float max = 0;
+            int index = 0;
             foreach (float f in result)
             {
                 if (f < 0)
                 {
                     throw new ArgumentException("All weights should be positive. Use AbsWeights or ShiftWeightsToPositive if needed.");
                 }
-                max += f;
+                if (f > top) top = f;
+                if (f < bottom) bottom = f;
+                result[index] *= -1;
+                index++;
             }
-            for (int i = 0; i < result.Length; i++)
+            for(int i = 0; i < result.Length; i++)
             {
-                float alpha = Mathf.Lerp(1, 0, result[i] / max);
-                result[i] = Mathf.Lerp(0, max, alpha);
+                result[i] += (bottom + top);
             }
-            return result.ToArray();
+            return result;
         }
 
         /// <summary>
@@ -125,7 +110,7 @@ namespace Grepid.Random
         /// </summary>
         /// <param name="weights"></param>
         /// <returns></returns>
-        public static int WeightedIndex(ICollection<float> weights)
+        public static int RandomIndex(ICollection<float> weights)
         {
             float totalWeights = 0;
 
@@ -162,28 +147,7 @@ namespace Grepid.Random
         /// <param name="noDupes"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-
-        //I originally wrote the functions that can be told to iterate recursively. I don't know why, but I simplified them and decided to keep
-        //their recursive selves as commented out methods because recursion is cool and it makes me feel fancy :3
-
-        /*public static int[] WeightedIndexes(ICollection<float> weights,int repetitions,bool noDupes)
-        {
-            List<float> modifiedWeights = new List<float>(weights);
-            if (noDupes && repetitions > modifiedWeights.Count)
-            {
-                throw new ArgumentException("Cannot have more repetitions than objects whilst not allowing dupes.");
-            }
-            List<int> result = new List<int>();
-            int rand = WeightedIndex(modifiedWeights);
-            result.Add(rand);
-            if(noDupes) modifiedWeights.RemoveAt(rand);
-            if (repetitions - 1 == 0) return result.ToArray();
-            result.AddRange(WeightedIndexes(modifiedWeights, repetitions - 1, noDupes));
-            return result.ToArray();
-        }*/
-
-
-        public static int[] WeightedIndexes(ICollection<float> weights, int repetitions, bool noDupes)
+        public static int[] RandomIndexes(ICollection<float> weights, int repetitions, bool noDupes)
         {
             List<float> modifiedWeights = new List<float>(weights);
             List<int> usedIndexes = new List<int>();
@@ -194,10 +158,10 @@ namespace Grepid.Random
             List<int> result = new List<int>();
             for (int i = 0; i < repetitions; i++)
             {
-                int rand = WeightedIndex(modifiedWeights);
+                int rand = RandomIndex(modifiedWeights);
                 while (usedIndexes.Contains(rand) && noDupes)
                 {
-                    rand = WeightedIndex(modifiedWeights);
+                    rand = RandomIndex(modifiedWeights);
                 }
                 result.Add(rand);
                 if(noDupes) usedIndexes.Add(rand);
@@ -207,28 +171,28 @@ namespace Grepid.Random
 
         /// <summary>
         /// Will convert any given collection of objects into a float array given a field name to look for.
-        /// Useful for creating a collection of weights if needed.
+        /// Useful for creating a collection of weights from an Array of Class instances.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="objects"></param>
         /// <param name="fieldName"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static float[] ToWeightList<T>(ICollection<T> objects, string fieldName)
+        public static float[] ToWeights<T>(ICollection<T> objects, string fieldName)
         {
             float[] result = new float[objects.Count];
 
             Type type = typeof(T);
             string cacheKey = type.FullName + "_" + fieldName;
             FieldInfo fi;
-            if (fieldCache.ContainsKey(cacheKey))
+            if (s_fieldCache.ContainsKey(cacheKey))
             {
-                fi = fieldCache[cacheKey];
+                fi = s_fieldCache[cacheKey];
             }
             else
             {
                 fi = type.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                fieldCache[cacheKey] = fi;
+                s_fieldCache[cacheKey] = fi;
             }
 
             if(fi == null)
@@ -255,8 +219,8 @@ namespace Grepid.Random
         /// <returns></returns>
         public static T RandomFromCollection<T>(ICollection<T> objects,string weightFieldName)
         {
-            var asWeights = ToWeightList(objects, weightFieldName);
-            return objects.ElementAt(WeightedIndex(asWeights));
+            var asWeights = ToWeights(objects, weightFieldName);
+            return objects.ElementAt(RandomIndex(asWeights));
         }
 
         /// <summary>
@@ -269,26 +233,6 @@ namespace Grepid.Random
         /// <param name="noDupes"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-
-        //I originally wrote the functions that can be told to iterate recursively. I don't know why, but I simplified them and decided to keep
-        //their recursive selves as commented out methods because recursion is cool and it makes me feel fancy :3
-
-        /*public static T[] RandomFromCollection<T>(ICollection<T> objects,string weightFieldName,int repetitions,bool noDupes)
-        {
-            List<T> modifiedObjects = new List<T>(objects);
-            if (noDupes && repetitions > modifiedObjects.Count)
-            {
-                throw new ArgumentException("Cannot have more repetitions than objects whilst not allowing dupes.");
-            }
-            List<T> result = new List<T>();
-            T rand = RandomFromCollection(modifiedObjects,weightFieldName);
-            result.Add(rand);
-            if(noDupes) modifiedObjects.Remove(rand);
-            if (repetitions - 1 == 0) return result.ToArray();
-            result.AddRange(RandomFromCollection(modifiedObjects, weightFieldName, repetitions - 1, noDupes));
-            return result.ToArray();
-        }*/
-
         public static T[] RandomFromCollection<T>(ICollection<T> objects, string weightFieldName, int repetitions, bool noDupes)
         {
             List<T> modifiedObjects = new List<T>(objects);
@@ -307,11 +251,15 @@ namespace Grepid.Random
             return result.ToArray();
         }
     }
+    #endregion
 
+
+
+    #region Random
     public static class Rand 
     {
         /// <summary>
-        /// Will simply return a random element from a collection.
+        /// Will return a random element from a collection.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="objects"></param>
@@ -320,6 +268,7 @@ namespace Grepid.Random
         {
             return objects.ElementAt(UnityEngine.Random.Range(0, objects.Count));
         }
+
         /// <summary>
         /// Will return an array of elements from a collection with extra controls.
         /// </summary>
@@ -349,5 +298,6 @@ namespace Grepid.Random
             return result;
         }
     }
+    #endregion
 }
 
