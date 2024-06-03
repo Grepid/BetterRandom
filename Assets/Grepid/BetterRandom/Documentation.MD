@@ -35,7 +35,8 @@ RandomIndex(ICollection-float- weights) gives you the index of a chosen element 
 `Item chosenItem = items[index];`<br/>
 This has an array of items to spawn, and chooses a random index based on a variable in the Item class called "spawnChance".</br>
 </br>
-RandomIndex(ICollection-float- weights , int repetitions , bool noDupes) Same as RandomIndex without overrides, except allows you do get an array of indexes it selects. Controls are the same as RandomFromCollection repetitions. 
+### <font color = #f5dd42>RandomIndexes</font>
+RandomIndexes(ICollection-float- weights , int repetitions , bool noDupes) Same as RandomIndex, except returns an array of indexes and has extra controls. Controls are the same as RandomFromCollection repetitions. 
 
 ### <font color = #f5dd42>FlipWeights</font>
 FlipWeights(ICollection-float- weights) will take a collection of floats and flip the floats around in place. For example<br/>
