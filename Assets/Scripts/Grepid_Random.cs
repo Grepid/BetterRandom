@@ -7,7 +7,6 @@ using System.Reflection;
 using System.Xml;
 using UnityEditor;
 using UnityEngine;
-using static UnityEngine.Networking.UnityWebRequest;
 
 namespace Grepid.Random
 {
